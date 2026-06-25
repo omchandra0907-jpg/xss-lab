@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="author" content="Om Chandra">
+  <title>XSS Lab — Cross-Site Scripting Simulator</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+  <nav class="site-nav">
+    <a href="../index.html" class="nav-back">← back to hub</a>
+    <span class="nav-title">By Om Chandra</span>
+  </nav>
+
+  <main class="page-wrap">
+
+    <header class="page-header">
+      <h1><span class="prompt">&gt;</span> XSS Lab</h1>
+    </header>
+
+  
+
+    <!-- the lab -->
+    <section class="card">
+      <h2>💉 XSS Injection Tester</h2>
+         <textarea id="xss-input" rows="5" placeholder="" style="width: 100%; font-family: 'JetBrains Mono', monospace; margin-bottom: 15px; padding: 10px; border-radius: 4px; border: 1px solid #ccc;"></textarea>
+
+      <!-- sanitize toggle -->
+      <div class="toggle-row">
+        <label class="switch">
+          <input type="checkbox" id="sanitize-toggle" onchange="updateToggleLabel()">
+          <span class="slider"></span>
+        </label>
+        <span class="toggle-label" id="toggle-label">Sanitization: OFF (vulnerable)</span>
+      </div>
+
+      <button class="render-btn" onclick="renderOutput()">render input</button>
+
+      <!-- quick payload buttons -->
+      <p style="font-size: 0.75rem; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; margin-bottom: 6px;">
+        try these payloads:
+      </p>
+      <div class="samples">
+        <button class="sample-btn" onclick="loadSample(0)">&lt;b&gt;bold&lt;/b&gt;</button>
+        <button class="sample-btn" onclick="loadSample(1)">session hijacking (script)</button>
+        <button class="sample-btn" onclick="loadSample(2)">img payload (onerror)</button>
+        
+        
+      </div>
+    </section>
+
+    <!-- output -->
+    <section class="card">
+      <p class="output-label">rendered output ↓</p>
+      <div class="vulnerable-output" id="xss-output">
+        output will appear here...
+      </div>
+    </section>
+
+    <!-- explanation -->
+    <section class="card">
+      <h2>📖 How It Works</h2>
+      <p>
+        XSS happens when user input gets inserted into a page without being sanitized.
+        The browser treats it as real HTML/JavaScript and executes it.
+      </p>
+
+      <div class="code-block">
+        <span class="comment">// ❌ VULNERABLE — innerHTML parses HTML tags</span><br>
+        <span class="danger">element.innerHTML = userInput;</span><br><br>
+        <span class="comment">// ✅ SAFE — replaces &lt; and &gt; with harmless entities</span><br>
+        <span class="safe">input = input.replace(/&lt;/g, '&amp;lt;').replace(/&gt;/g, '&amp;gt;');</span><br>
+        <span class="safe">element.innerHTML = input;</span><br><br>
+        <span class="comment">// ✅ ALSO SAFE — textContent never parses HTML</span><br>
+        <span class="safe">element.textContent = userInput;</span>
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+
+  // Sample XSS payloads for demonstration
+  // In real web audits, we look for input entry points that lack validation
+  const samples = [
+    '<b>bold text works safely</b>',
+    '<script>document.getElementById(\'xss-output\').innerHTML = \'Exfiltrating Cookie: session_id=\' + Math.random().toString(36).substring(2);<\/script>',
+    '<img src=x onerror="alert(\'XSS executed via image onerror handler!\')">',
+    '<h1 style="color:var(--accent-red); font-family:\'JetBrains Mono\'">DEFACED WEBSITE BY HACKER</h1>',
+    '<iframe src="https://example.com" width="100%" height="80"></iframe>'
+  ];
+
+  function loadSample(index) {
+    document.getElementById('xss-input').value = samples[index];
+  }
+
+  function renderOutput() {
+    let input = document.getElementById('xss-input').value;
+    let output = document.getElementById('xss-output');
+    let sanitized = document.getElementById('sanitize-toggle').checked;
+
+    if (sanitized) {
+      // this is the fix — replace angle brackets with html entities
+      // so the browser shows them as text instead of parsing them
+      input = input.replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#039;');
+      output.innerHTML = input;
+    } else {
+      // This simulates a reflected XSS attack safely in the DOM.
+      // innerHTML is literally the vulnerability because it parses tags.
+      // But browsers block <script> from executing via innerHTML.
+      // So we write explicit code to parse and run the script element, simulating the browser vulnerability!
+      output.innerHTML = input;
+      
+      const scripts = output.getElementsByTagName('script');
+      for (let s of scripts) {
+        const newScript = document.createElement('script');
+        newScript.textContent = s.textContent;
+        document.body.appendChild(newScript);
+        newScript.remove(); // Clean up tag, code already ran in DOM
+      }
+    }
+  }
+
+  function updateToggleLabel() {
+    let on = document.getElementById('sanitize-toggle').checked;
+    let label = document.getElementById('toggle-label');
+    if (on) {
+      label.textContent = 'Sanitization: ON (protected)';
+      label.classList.add('active');
+    } else {
+      label.textContent = 'Sanitization: OFF (vulnerable)';
+      label.classList.remove('active');
+    }
+  }
+
+  </script>
+
+</body>
+</html>
